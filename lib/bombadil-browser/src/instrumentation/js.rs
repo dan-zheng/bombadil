@@ -66,12 +66,12 @@ pub const HITS_CACHE_SIZE: usize = 64 * 1024;
 const LOCATION_PREVIOUS: &str = "previous";
 
 const PRELUDE: &str = formatcp!(
-    "window.{NAMESPACE} = window.{NAMESPACE} || {{
-        {EDGES_PREVIOUS}: new window.Uint8Array({EDGE_MAP_SIZE}),
-        {EDGES_CURRENT}: new window.Uint8Array({EDGE_MAP_SIZE}),
+    "globalThis.{NAMESPACE} = globalThis.{NAMESPACE} || {{
+        {EDGES_PREVIOUS}: new globalThis.Uint8Array({EDGE_MAP_SIZE}),
+        {EDGES_CURRENT}: new globalThis.Uint8Array({EDGE_MAP_SIZE}),
         {LOCATION_PREVIOUS}: 0,
-        {HITS}: new window.Set(),
-        {HITS_CACHE}: new window.Int32Array({HITS_CACHE_SIZE}).fill(-1),
+        {HITS}: new globalThis.Set(),
+        {HITS_CACHE}: new globalThis.Int32Array({HITS_CACHE_SIZE}).fill(-1),
     }};"
 );
 
@@ -1579,5 +1579,19 @@ mod tests {
         "#;
 
         assert_snapshot!(snapshot(source_text));
+    }
+
+    #[test]
+    fn test_hoisted_window_function_does_not_break_prelude() {
+        // Libraries such as RxJS (bundled by Angular 19 / Vite) declare a
+        // top-level `function window(...)` operator, which hoists above the
+        // injected prelude and shadows the global `window` object.
+        let source_text = r#"
+            const result = window(true);
+            function window(flag) {
+                return flag ? 1 : 0;
+            }
+        "#;
+        assert_eq!(coverage_hits(SourceId("/rxjs.js".into()), source_text), 1);
     }
 }
